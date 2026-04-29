@@ -10,7 +10,10 @@ The energy function counts H-H contacts between non-bonded neighbors
 
 """
 #When two H residues find each other, the system releases energy — it becomes more stable. Lower energy = more stable = more folded.
-def is_valid (chain):
+def is_valid (chain): 
+    """
+    a chain is valid if it has no duplicates
+    """
     chain_set = set(chain)
     return len(chain_set) == len(chain)
 
