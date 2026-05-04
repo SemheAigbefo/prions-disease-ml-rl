@@ -9,7 +9,7 @@ The energy function counts H-H contacts between non-bonded neighbors
  This simulator is the thing everything else runs on.
 
 """
-#When two H residues find each other, the system releases energy — it becomes more stable. Lower energy = more stable = more folded.
+#When two H residues find each other, the system releases energy, it becomes more stable. lower energy = more stable = more folded.
 def is_valid (chain): 
     """
     a chain is valid if it has no duplicates
@@ -42,7 +42,7 @@ def pivot_move(chain):
     
     # pick a random bead that isn't the first or last
     pivot_idx = random.randint(1, n - 2)
-    px, py = chain[pivot_idx]
+    px, py = chain[pivot_idx] #index x and y of the random bead
     
     # three possible rotations around the pivot point
     rotations = [
@@ -58,7 +58,7 @@ def pivot_move(chain):
     # either everything before the pivot, or everything after
     new_chain = []
     for i in range(n):
-        if i < pivot_idx:
+        if i < pivot_idx: 
             # rotate the left side, keep right side
             new_chain.append(rotate(chain[i][0], chain[i][1]))
         else:
@@ -68,6 +68,7 @@ def pivot_move(chain):
     if is_valid(new_chain):
         return new_chain
     return None
+
 
 def end_move(chain):
     n = len(chain)
@@ -289,6 +290,86 @@ def plot_trajectories(sequence, chain, n_trials=20, steps=10000):
     print(f"Runs trapped in local minimum: {trapped}/{n_trials}")
     print(f"Trapping rate: {round(trapped/n_trials*100)}%")
     print(f"Final energy distribution: {energy_counts}")
+def plot_small_multiples(sequence, chain, n_trials=20, steps=50000):
+    
+    results = []
+    for i in range(n_trials):
+        result = monte_carlo(sequence, chain, steps=steps)
+        results.append(result)
+        print(f"Trial {i+1}/{n_trials}: final energy = {result['final_energy']}")
+    
+    best_overall = min(r['best_energy'] for r in results)
+    
+    # 4 columns, enough rows to fit all trials
+    n_cols = 4
+    n_rows = -(-n_trials // n_cols)  # ceiling division
+    
+    fig, axes = plt.subplots(n_rows, n_cols, 
+                             figsize=(16, n_rows * 3),
+                             sharex=False, sharey=True)
+    axes = axes.flatten()
+    
+    for i, (result, ax) in enumerate(zip(results, axes)):
+        
+        escaped = result['final_energy'] == best_overall
+        color   = '#1D9E75' if escaped else '#7F77DD'
+        border  = '#1D9E75' if escaped else '#7F77DD'
+        
+        # sample every 100 steps so lines are clean
+        traj = result['trajectory'][::100]
+        steps_x = list(range(0, len(result['trajectory']), 100))
+        
+        ax.plot(steps_x, traj, color=color, linewidth=1.2)
+        ax.axhline(y=best_overall, color='#EF9F27', 
+                  linestyle=':', linewidth=0.8, alpha=0.6)
+        
+        # color the border to immediately show escaped vs trapped
+        for spine in ax.spines.values():
+            spine.set_edgecolor(border)
+            spine.set_linewidth(2)
+        
+        status = 'ESCAPED' if escaped else 'TRAPPED'
+        ax.set_title(f'run {i+1}  |  {status}  |  final: {result["final_energy"]}', 
+                    fontsize=8, color=color, fontweight='bold')
+        ax.set_xlabel('step', fontsize=7)
+        ax.set_ylabel('energy', fontsize=7)
+        ax.tick_params(labelsize=7)
+        
+        # mark exactly where it got trapped
+        if not escaped:
+            final_e = result['final_energy']
+            # find the step where it first reached final energy and stayed
+            traj_full = result['trajectory']
+            for step_idx in range(len(traj_full)-1, -1, -1):
+                if traj_full[step_idx] != final_e:
+                    trap_step = step_idx + 1
+                    break
+            else:
+                trap_step = 0
+            ax.axvline(x=trap_step, color='#D85A30', 
+                      linestyle='--', linewidth=0.8, alpha=0.7)
+            ax.text(trap_step, final_e + 0.2, 'trapped here', 
+                   fontsize=6, color='#D85A30')
+    
+    # hide any unused panels
+    for j in range(n_trials, len(axes)):
+        axes[j].set_visible(False)
+    
+    escaped_count = sum(1 for r in results if r['final_energy'] == best_overall)
+    fig.suptitle(
+        f'Individual run trajectories — {escaped_count}/{n_trials} escaped to global min ({best_overall})\n'
+        f'Orange dotted line = global minimum   |   Red dashed line = moment of trapping',
+        fontsize=11, fontweight='bold', y=1.01
+    )
+    
+    plt.tight_layout()
+    plt.savefig('small_multiples.png', dpi=150, bbox_inches='tight')
+    print(f"\nSaved to small_multiples.png")
+    print(f"Escaped: {escaped_count}/{n_trials}")
+
+sequence = "HPHPPHHPHPPHPHHPPHPH"
+chain = [(i, 0) for i in range(len(sequence))]
+plot_small_multiples(sequence, chain, n_trials=20, steps=50000)
 
 sequence = "HPHPPHHPHPPHPHHPPHPH"
 chain = [(i, 0) for i in range(len(sequence))]
